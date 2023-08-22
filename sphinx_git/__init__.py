@@ -201,6 +201,86 @@ class GitChangelog(GitDirectiveBase):
         return [list_node]
 
 
+
+
+
+# pylint: disable=too-few-public-methods
+class GitTags(GitDirectiveBase):
+    default_sha_length = 7
+
+    option_spec = {
+        'tags': directives.nonnegative_int,
+    }
+
+    # pylint: disable=attribute-defined-outside-init
+    def run(self):
+        self.repo = self._find_repo()
+
+        if not self.repo.head.is_detached:
+            self.branch_name = self.repo.head.ref.name
+
+        self.sha_length = self.options.get('sha_length',
+                                           self.default_sha_length)
+
+        
+        self.tag_list = self.repo.tags
+
+        self.commit = self.repo.commit()
+        self.sha_length = self.options.get('sha_length',
+                                           self.default_sha_length)
+        markup = self._build_markup()
+        return markup
+
+    def _build_table(self):
+
+        table = nodes.table(cols=3)
+        group = nodes.tgroup()
+        head = nodes.thead()
+        body = nodes.tbody()
+
+        table += group
+        group += head
+        group += body
+
+        row = nodes.row()
+        row += nodes.entry('', nodes.paragraph('', nodes.Text('Version')))
+        row += nodes.entry('', nodes.paragraph('', nodes.Text('Date')))
+        row += nodes.entry('', nodes.paragraph('', nodes.Text('Author')))
+        head += row
+
+        for ref_tag in self.tag_list:
+            tag = ref_tag.tag
+            date_str = datetime.fromtimestamp(tag.tagged_date)
+            row = nodes.row()
+            row += nodes.entry('', nodes.paragraph('', nodes.Text(tag.tag)))
+            row += nodes.entry('', nodes.paragraph('', nodes.Text(date_str)))
+            row += nodes.entry('', nodes.paragraph('', nodes.Text(tag.tagger)))
+            body += row
+
+        return [table]
+    
+    def _build_markup(self):
+
+        list_node = nodes.bullet_list()
+
+        for ref_tag in self.tag_list:
+
+            item = nodes.list_item()
+            par = nodes.paragraph()
+
+            tag = ref_tag.tag
+            date_str = datetime.fromtimestamp(tag.tagged_date)
+            
+            par += nodes.inline(text=tag.tag)
+            par += nodes.inline(text=date_str)
+            par += nodes.inline(text=six.text_type(tag.tagger))
+
+            item.append(par)
+            list_node.append(item)
+
+        return [list_node]
+
 def setup(app):
     app.add_directive('git_changelog', GitChangelog)
     app.add_directive('git_commit_detail', GitCommitDetail)
+    app.add_directive('git_tag_table', GitTags)
